@@ -52,7 +52,7 @@ func main() {
 
 	flag.IntVar(&cfg.port, "port", 4000, "HTTP server port")
 	flag.StringVar(&cfg.env, "env", "development", "Environment (development|production)")
-	flag.StringVar(&cfg.api, "api", "http://localhost:4001", "API URL")
+	flag.StringVar(&cfg.api, "api", "http://localhost:4002", "API URL")
 	flag.Parse()
 
 	cfg.stripe.key = os.Getenv("STRIPE_KEY")

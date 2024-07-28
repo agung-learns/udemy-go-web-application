@@ -9,7 +9,7 @@ import (
 )
 
 type templateData struct {
-	String          map[string]string
+	StringMap       map[string]string
 	IntMap          map[string]int
 	FloatMap        map[string]float64
 	Data            map[string]any
@@ -28,6 +28,7 @@ var functions template.FuncMap = template.FuncMap{}
 var templateFS embed.FS
 
 func (app *application) addDefaultData(td *templateData, r *http.Request) *templateData {
+	td.API = app.config.api
 	return td
 }
 

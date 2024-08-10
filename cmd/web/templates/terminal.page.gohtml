@@ -11,7 +11,7 @@
         <div class="alert alert-danger text-center d-none" id="card-messages"></div>
 
         <form
-            action="/payment-succeeded"
+            action="/virtual-terminal-payment-succeeded"
             method="post"
             name="change_form"
             id="change_form"
@@ -20,8 +20,8 @@
             novalidate>
 
             <div class="mb-3">
-                <label for="amount" class="form-label">Amount</label>
-                <input type="text" class="form-control" id="amount" name="amount" required autocomplete="amount-new">
+                <label for="charge_amount" class="form-label">Amount</label>
+                <input type="text" class="form-control" id="charge_amount" required autocomplete="charge_amount-new">
             </div>
 
             <div class="mb-3">
@@ -41,6 +41,7 @@
                 <div class="alert-success text-center" id="card-success" role="alert"></div>
             </div>
 
+            <input type="hidden" name="amount" id="amount">
             <input type="hidden" name="payment_intent" id="payment_intent">
             <input type="hidden" name="payment_method" id="payment_method">
             <input type="hidden" name="payment_amount" id="payment_amount">
@@ -60,134 +61,15 @@
         
     {{ end }}
 
-    {{ define "js" }}
-        <script src="https://js.stripe.com/v3/"></script>
-        <script>
-            let card;
-            let stripe;
-            const cardMessages = document.getElementById('card-messages');
-            const payButton = document.getElementById('pay-button');
-            const processing = document.getElementById('processing-payment');
-
-            stripe = new Stripe({{ index .StringMap "publishable_key" }});
-
-            function hidePayButton() {
-                payButton.classList.add('d-none');
-                processing.classList.remove('d-none');
+{{ define "js" }}
+    <script>
+        document.getElementById("charge_amount").addEventListener("change", (evt) => {
+            if (evt.target.value !== "") {
+                document.getElementById('amount').value = parseInt((evt.target.value * 100), 10);
+            } else {
+                document.getElementById('amount').value = 0;
             }
-
-            function showPayButtons() {
-                payButton.classList.remove('d-none');
-                processing.classList.add('d-none');
-            }
-
-            function showCardError(msg) {
-                cardMessages.classList.add('alert-danger');
-                cardMessages.classList.remove('alert-success');
-                cardMessages.classList.remove('d-none');
-                cardMessages.innerText = msg;
-            }
-
-            function showCardSuccess() {
-                cardMessages.classList.remove('alert-danger');
-                cardMessages.classList.remove('alert-success');
-                cardMessages.classList.remove('d-none');
-                cardMessages.innerText = "Transaction Successfully!";
-            }
-
-            function val() {
-                let form = document.getElementById('change_form');
-                if (form.checkValidity() === false) {
-                    this.event.preventDefault();
-                    this.event.stopPropagation();
-
-                    form.classList.add('was-validated');
-                    return;
-                }
-
-                form.classList.add('was-validated');
-                hidePayButton();
-
-                let amountCharge = String(parseFloat(document.getElementById('amount').value) * 100)
-                let payload = {
-                    amount: amountCharge,
-                    currency: 'cad',
-                }
-
-                const requestOpts = {
-                    method: 'post',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content': 'application/json',
-                    },
-                    body: JSON.stringify(payload),
-                }
-
-                fetch('{{ .API }}/api/payment-intent', requestOpts).then(res => res.text()).then(res => {
-                    let data;
-                    try {
-                        data = JSON.parse(res);
-                        stripe.confirmCardPayment(data.client_secret, {
-                            payment_method: {
-                                card: card,
-                                billing_details: {
-                                    name: document.getElementById('cardholder-name').value,
-                                }
-                            }
-                        }).then(function(result) {
-                            if (result.error) {
-                                showCardError(result.error.message);
-                                showPayButtons();
-                            } else if (result.paymentIntent) {
-                                if (result.paymentIntent.status === "succeeded") {
-                                    document.getElementById('payment_method').value = result.paymentIntent.payment_method_types[0];
-                                    document.getElementById('payment_intent').value = result.paymentIntent.id;
-                                    document.getElementById('payment_amount').value = result.paymentIntent.amount;
-                                    document.getElementById('payment_currency').value = result.paymentIntent.currency;
-                                    // document.getElementById('cardholder-email').value = result.paymentIntent.email;
-                                    processing.classList.add('d-none');
-                                    showCardSuccess();
-
-                                    document.getElementById("change_form").submit();
-                                }
-                            }
-                        });
-                    } catch (e) {
-                        console.log('e', e);
-                        showCardError("Invalid response payment gateway");
-                        showPayButtons();
-                    }
-                })
-            }
-
-            (function() {
-                // create stripe
-                const elements = stripe.elements();
-                const style = {
-                    base: {
-                        fontSize: '16px',
-                        lineHeight: '24px'
-                    }
-                }
-
-                // create card entire
-                card = elements.create('card', {
-                    style: style,
-                    hidePostalCode: true,
-                });
-                card.mount('#card-element');
-
-                // check error
-                card.addEventListener('change', (event) => {
-                    var displayErrors = document.getElementById('card-errors');
-                    if (event.error) {
-                        displayErrors.classList.remove('d-none');
-                        displayErrors.textContent = event.error.message;
-                    } else {
-                        displayErrors.classList.add('d-none');
-                        displayErrors.textContent = "";
-                    }
-                })
-            })();
-        </script>
-    {{ end }}
+        })
+    </script>
+    {{ template "stripe-js" . }}
+{{ end }}

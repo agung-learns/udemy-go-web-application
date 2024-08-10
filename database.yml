@@ -1,0 +1,7 @@
+development:
+  dialect: postgres
+  database: golearn_db
+  user: golearn_user
+  password: golearn_password
+  host: 127.0.0.1
+  pool: 5

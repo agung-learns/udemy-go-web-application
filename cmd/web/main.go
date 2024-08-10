@@ -1,9 +1,13 @@
 package main
 
 import (
+	"encoding/gob"
 	"flag"
 	"fmt"
+	"github.com/alexedwards/scs/v2"
 	"html/template"
+	"learn1/internal/driver"
+	"learn1/internal/models"
 	"log"
 	"net/http"
 	"os"
@@ -12,6 +16,8 @@ import (
 
 const version = "1.0.0"
 const cssVersion = "1"
+
+var session *scs.SessionManager
 
 type config struct {
 	port int
@@ -32,6 +38,8 @@ type application struct {
 	errorLog      *log.Logger
 	templateCache map[string]*template.Template
 	version       string
+	DB            models.DBModel
+	Session       *scs.SessionManager
 }
 
 func (app *application) serve() error {
@@ -48,11 +56,13 @@ func (app *application) serve() error {
 }
 
 func main() {
+	gob.Register(TransactionData{})
 	var cfg config
 
 	flag.IntVar(&cfg.port, "port", 4000, "HTTP server port")
 	flag.StringVar(&cfg.env, "env", "development", "Environment (development|production)")
 	flag.StringVar(&cfg.api, "api", "http://localhost:4002", "API URL")
+	flag.StringVar(&cfg.db.dsn, "dsn", "postgres://golearn_user:golearn_password@localhost:5432/golearn_db?sslmode=disable", "Database DSN")
 	flag.Parse()
 
 	cfg.stripe.key = os.Getenv("STRIPE_KEY")
@@ -60,6 +70,15 @@ func main() {
 
 	infoLog := log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime)
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
+
+	conn, err := driver.OpenDB(cfg.db.dsn)
+	if err != nil {
+		errorLog.Fatal(err)
+	}
+	defer conn.Close()
+
+	session = scs.New()
+	session.Lifetime = 24 * time.Hour
 
 	tc := make(map[string]*template.Template)
 
@@ -69,11 +88,13 @@ func main() {
 		errorLog:      errorLog,
 		templateCache: tc,
 		version:       version,
+		DB: models.DBModel{
+			DB: conn,
+		},
+		Session: session,
 	}
 
-	err := app.serve()
-	if err != nil {
+	if err := app.serve(); err != nil {
 		app.errorLog.Fatal(err)
-		//log.Fatal(err)
 	}
 }

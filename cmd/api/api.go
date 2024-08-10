@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"learn1/internal/driver"
+	"learn1/internal/models"
 	"log"
 	"net/http"
 	"os"
@@ -28,6 +30,7 @@ type application struct {
 	infoLog  *log.Logger
 	errorLog *log.Logger
 	version  string
+	DB       models.DBModel
 }
 
 func (app *application) serve() error {
@@ -48,6 +51,7 @@ func main() {
 
 	flag.IntVar(&cfg.port, "port", 4002, "HTTP server port")
 	flag.StringVar(&cfg.env, "env", "development", "Environment (development|production|maintenance)")
+	flag.StringVar(&cfg.db.dsn, "dsn", "postgres://golearn_user:golearn_password@localhost:5432/golearn_db?sslmode=disable", "Database DSN")
 	flag.Parse()
 
 	cfg.stripe.key = os.Getenv("STRIPE_KEY")
@@ -56,16 +60,23 @@ func main() {
 	infoLog := log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime)
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
 
+	conn, err := driver.OpenDB(cfg.db.dsn)
+	if err != nil {
+		errorLog.Fatal(err)
+	}
+	defer conn.Close()
+
 	app := &application{
 		config:   cfg,
 		infoLog:  infoLog,
 		errorLog: errorLog,
 		version:  version,
+		DB: models.DBModel{
+			DB: conn,
+		},
 	}
 
-	err := app.serve()
-	if err != nil {
+	if err := app.serve(); err != nil {
 		app.errorLog.Fatal(err)
-		//log.Fatal(err)
 	}
 }

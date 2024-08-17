@@ -257,3 +257,27 @@ func (app *application) ChargeOnce(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+func (app *application) GoldPlan(w http.ResponseWriter, r *http.Request) {
+	widget, err := app.DB.GetWidget(2)
+	if err != nil {
+		app.errorLog.Println(err)
+		return
+	}
+
+	data := make(map[string]interface{})
+	data["widget"] = widget
+	if err := app.renderTemplate(w, r, "gold-plan", &templateData{
+		Data: data,
+	}); err != nil {
+		app.errorLog.Println(err)
+		return
+	}
+}
+
+func (app *application) GoldPlanReceipt(w http.ResponseWriter, r *http.Request) {
+	if err := app.renderTemplate(w, r, "receipt-plan", &templateData{}); err != nil {
+		app.errorLog.Println(err)
+		return
+	}
+}

@@ -11,3 +11,4 @@ https://www.udemy.com/course/building-web-applications-with-go-intermediate-leve
 ### Sections
 - [Section 3](https://github.com/agung-learns/udemy-go-web-application/tree/feature/section-3)
 - [Section 4](https://github.com/agung-learns/udemy-go-web-application/tree/feature/section-4)
+- [Section 5](https://github.com/agung-learns/udemy-go-web-application/tree/feature/section-5)

@@ -281,3 +281,10 @@ func (app *application) GoldPlanReceipt(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 }
+
+func (app *application) LoginPage(w http.ResponseWriter, r *http.Request) {
+	if err := app.renderTemplate(w, r, "login", &templateData{}); err != nil {
+		app.errorLog.Println(err)
+		return
+	}
+}

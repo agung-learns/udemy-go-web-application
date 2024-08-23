@@ -9,6 +9,8 @@ func (app *application) routes() http.Handler {
 	mux := chi.NewRouter()
 	mux.Use(SessionLoad)
 
+	mux.Get("/login", app.LoginPage)
+
 	mux.Get("/", app.Home)
 	mux.Get("/virtual-terminal", app.VirtualTerminal)
 	mux.Post("/virtual-terminal-payment-succeeded", app.VirtualTerminalPaymentSucceeded)

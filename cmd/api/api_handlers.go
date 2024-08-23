@@ -2,12 +2,15 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/stripe/stripe-go/v79"
 	"learn1/internal/cards"
 	"learn1/internal/models"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -199,6 +202,102 @@ func (app *application) CreateCustomerAndSubscribeToPlan(w http.ResponseWriter, 
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(out)
+}
+
+func (app *application) CreateAuthToken(w http.ResponseWriter, r *http.Request) {
+	var userInput struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	err := app.readJSON(w, r, &userInput)
+	if err != nil {
+		_ = app.badRequest(w, r, err)
+		return
+	}
+
+	user, err := app.DB.GetUserByEmail(userInput.Email)
+	if err != nil {
+		fmt.Println("error", err)
+		_ = app.invalidCredentials(w)
+		return
+	}
+
+	validPassword, err := app.passwordMatches(user.Password, userInput.Password)
+	if err != nil {
+		_ = app.invalidCredentials(w)
+		return
+	}
+	if !validPassword {
+		_ = app.invalidCredentials(w)
+		return
+	}
+
+	token, err := models.GenerateToken(user.ID, 24*time.Hour, models.ScopeAuthentication)
+	if err != nil {
+		_ = app.badRequest(w, r, err)
+		return
+	}
+
+	err = app.DB.InsertToken(token, user)
+	if err != nil {
+		app.errorLog.Println(err)
+		return
+	}
+
+	var payload struct {
+		Error   bool          `json:"error"`
+		Message string        `json:"message,omitempty"`
+		Token   *models.Token `json:"authentication_token"`
+	}
+	payload.Error = false
+	payload.Message = fmt.Sprintf("token for %s created", userInput.Email)
+	payload.Token = token
+
+	if err := app.writeJSON(w, http.StatusOK, payload); err != nil {
+		app.errorLog.Println(err)
+	}
+}
+
+func (app *application) authenticateToken(r *http.Request) (*models.User, error) {
+	authorizationHeader := r.Header.Get("Authorization")
+	if authorizationHeader == "" {
+		return nil, errors.New("no authorization header")
+	}
+
+	headerParts := strings.Split(authorizationHeader, " ")
+	if len(headerParts) != 2 || headerParts[0] != "Bearer" {
+		return nil, errors.New("invalid authorization header")
+	}
+
+	token := headerParts[1]
+	if len(token) != 26 {
+		return nil, errors.New("invalid token length")
+	}
+
+	//
+	user, err := app.DB.GetUserForToken(token)
+	if err != nil {
+		return nil, errors.New("no matching user")
+	}
+
+	return user, nil
+}
+
+func (app *application) CheckAuthentication(w http.ResponseWriter, r *http.Request) {
+	user, err := app.authenticateToken(r)
+	if err != nil {
+		_ = app.invalidCredentials(w)
+	}
+
+	var payload struct {
+		Error   bool   `json:"error"`
+		Message string `json:"message"`
+	}
+	payload.Error = false
+	payload.Message = fmt.Sprintf("authenticated user %s", user.Email)
+
+	_ = app.writeJSON(w, http.StatusOK, payload)
 }
 
 func (app *application) SaveCustomer(firstName, lastName, email string) (int, error) {

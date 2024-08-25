@@ -4,6 +4,7 @@ import (
 	"encoding/gob"
 	"flag"
 	"fmt"
+	"github.com/alexedwards/scs/postgresstore"
 	"github.com/alexedwards/scs/v2"
 	"html/template"
 	"learn1/internal/driver"
@@ -79,6 +80,7 @@ func main() {
 
 	session = scs.New()
 	session.Lifetime = 24 * time.Hour
+	session.Store = postgresstore.New(conn)
 
 	tc := make(map[string]*template.Template)
 

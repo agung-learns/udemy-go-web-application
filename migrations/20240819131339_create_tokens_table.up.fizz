@@ -6,6 +6,7 @@ create_table("tokens") {
   t.Column("token_hash", "string", {})
 }
 
+sql("alter table orders alter column created_at set default now();")
 sql("alter table tokens alter column created_at set default now();")
 sql("alter table tokens alter column updated_at set default now();")
 sql("ALTER table tokens alter column token_hash TYPE BYTEA USING token_hash::BYTEA;")

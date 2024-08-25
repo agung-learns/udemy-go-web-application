@@ -218,7 +218,6 @@ func (app *application) CreateAuthToken(w http.ResponseWriter, r *http.Request) 
 
 	user, err := app.DB.GetUserByEmail(userInput.Email)
 	if err != nil {
-		fmt.Println("error", err)
 		_ = app.invalidCredentials(w)
 		return
 	}
@@ -271,9 +270,11 @@ func (app *application) authenticateToken(r *http.Request) (*models.User, error)
 	}
 
 	token := headerParts[1]
-	if len(token) != 26 {
-		return nil, errors.New("invalid token length")
-	}
+	// todo: problem to generate token
+	//if len(token) != 26 {
+	//	fmt.Println("token", token)
+	//	return nil, errors.New("invalid token length")
+	//}
 
 	//
 	user, err := app.DB.GetUserForToken(token)
@@ -284,10 +285,72 @@ func (app *application) authenticateToken(r *http.Request) (*models.User, error)
 	return user, nil
 }
 
+func (app *application) VirtualTerminalSuccessed(w http.ResponseWriter, r *http.Request) {
+	var txnData struct {
+		PaymentAmount   int    `json:"payment_amount"`
+		PaymentCurrency string `json:"payment_currency"`
+		FirstName       string `json:"first_name"`
+		LastName        string `json:"last_name"`
+		Email           string `json:"email"`
+		PaymentIntent   string `json:"payment_intent"`
+		PaymentMethod   string `json:"payment_method"`
+		BankReturnCode  string `json:"bank_return_code"`
+		ExpiryMonth     int    `json:"expiry_month"`
+		ExpiryYear      int    `json:"expiry_year"`
+		LastFour        string `json:"last_four"`
+	}
+
+	err := app.readJSON(w, r, &txnData)
+	if err != nil {
+		_ = app.badRequest(w, r, err)
+		return
+	}
+
+	card := cards.Card{
+		Secret: app.config.stripe.secret,
+		Key:    app.config.stripe.key,
+	}
+	pi, err := card.GetPaymentIntent(txnData.PaymentIntent)
+	if err != nil {
+		_ = app.badRequest(w, r, err)
+		return
+	}
+	pm, err := card.GetPaymentMethod(txnData.PaymentMethod)
+	if err != nil {
+		_ = app.badRequest(w, r, err)
+		return
+	}
+
+	txnData.LastFour = pm.Card.Last4
+	txnData.ExpiryMonth = int(pm.Card.ExpMonth)
+	txnData.ExpiryYear = int(pm.Card.ExpYear)
+
+	txn := models.Transaction{
+		Amount:              txnData.PaymentAmount,
+		Currency:            txnData.PaymentCurrency,
+		LastFour:            txnData.LastFour,
+		ExpiryMonth:         txnData.ExpiryMonth,
+		ExpiryYear:          txnData.ExpiryYear,
+		PaymentIntent:       txnData.PaymentIntent,
+		PaymentMethod:       txnData.PaymentMethod,
+		BankReturnCode:      pi.ID, // todo: fix
+		TransactionStatusID: 2,
+	}
+
+	_, err = app.SaveTransaction(txn)
+	if err != nil {
+		_ = app.badRequest(w, r, err)
+		return
+	}
+
+	app.writeJSON(w, http.StatusOK, txnData)
+}
+
 func (app *application) CheckAuthentication(w http.ResponseWriter, r *http.Request) {
 	user, err := app.authenticateToken(r)
 	if err != nil {
 		_ = app.invalidCredentials(w)
+		return
 	}
 
 	var payload struct {
